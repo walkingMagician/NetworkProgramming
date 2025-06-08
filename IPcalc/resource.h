@@ -11,7 +11,6 @@
 #define IDC_STATIC_PREFIX               1010
 #define IDC_EDIT_PREFIX                 1011
 #define IDC_SPIN_PREFIX                 1012
-#define IDC_CHECK_PREFIX                1016
 
 // Next default values for new objects
 // 

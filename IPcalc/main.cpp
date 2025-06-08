@@ -1,16 +1,17 @@
-﻿#include <Windows.h>
+﻿#define _CRT_SECURE_NO_WARNINGS
+#include <Windows.h>
+#include <iostream>
 #include <CommCtrl.h>
 #include <string>
-#include <sstream>
+#include <cstdio>
 #include "resource.h"
 
 
 BOOL CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-int MaskToPrefix(DWORD dwMask);
-DWORD PrefixToMask(int prefix);
-void CalculateNetworkInfo(HWND hwnd, DWORD ip, DWORD mask);
+//int MaskToPrefix(DWORD dwMask);
+//DWORD PrefixToMask(int prefix);
 
-bool checkBoxPrefix = false;
+//bool checkBoxPrefix = false;
 
 INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInst, LPSTR lpCmdLine, INT nCmdShow)
 {
@@ -28,6 +29,9 @@ BOOL CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		HWND hPrefix = GetDlgItem(hwnd, IDC_SPIN_PREFIX);
 		SendMessage(hPrefix, UDM_SETRANGE, 0, MAKELPARAM(32, 0));
 		SetFocus(GetDlgItem(hwnd, IDC_IPADDRESS_IP));
+
+		AllocConsole();
+		freopen("CONOUT$", "w", stdout);
 	} break;
 	case WM_COMMAND:
 	{
@@ -35,56 +39,28 @@ BOOL CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		HWND hIPmask = GetDlgItem(hwnd, IDC_IPADDRESS_MASK);
 		HWND hEditPrefix = GetDlgItem(hwnd, IDC_EDIT_PREFIX);
 		HWND hSpin = GetDlgItem(hwnd, IDC_SPIN_PREFIX);
-		HWND hCheckPrefix = GetDlgItem(hwnd, IDC_CHECK_PREFIX);
-		DWORD dwIPadddress = 0;
-		DWORD dwIPmask = 0;
+		DWORD dwIpAdddress = 0;
+		DWORD dwIpMask = 0;
 		switch (LOWORD(wParam))
 		{
 		case IDC_IPADDRESS_IP:
 		{
-			SendMessage(hIPaddress, IPM_GETADDRESS, 0, (LPARAM)&dwIPadddress);
-			if (FIRST_IPADDRESS(dwIPadddress) == 0) SendMessage(hIPmask, IPM_SETADDRESS, 0, 0x00000000);
-			else if (FIRST_IPADDRESS(dwIPadddress) < 128) SendMessage(hIPmask, IPM_SETADDRESS, 0, 0xFF000000);
-			else if (FIRST_IPADDRESS(dwIPadddress) < 192) SendMessage(hIPmask, IPM_SETADDRESS, 0, 0xFFFF0000);
-			else if (FIRST_IPADDRESS(dwIPadddress) < 224) SendMessage(hIPmask, IPM_SETADDRESS, 0, 0xFFFFFF00);
+			SendMessage(hIPaddress, IPM_GETADDRESS, 0, (LPARAM)&dwIpAdddress);
+			if (FIRST_IPADDRESS(dwIpAdddress) < 128) SendMessage(hIPmask, IPM_SETADDRESS, 0, 0xFF000000);
+			else if (FIRST_IPADDRESS(dwIpAdddress) < 192) SendMessage(hIPmask, IPM_SETADDRESS, 0, 0xFFFF0000);
+			else if (FIRST_IPADDRESS(dwIpAdddress) < 224) SendMessage(hIPmask, IPM_SETADDRESS, 0, 0xFFFFFF00);
 		}break;
 
 		case IDC_IPADDRESS_MASK:
 		{
-			if (!checkBoxPrefix)
-			{
-				SendMessage(hIPmask, IPM_GETADDRESS, 0, (LPARAM)&dwIPmask);
-				int prefix = MaskToPrefix(dwIPmask);
-				if (prefix != -1)
-				{
-					SetWindowText(hEditPrefix, std::to_wstring(prefix).c_str());
-				}
-			}
-		} break;
-		// создать новую кнопку для выбора режима работы префикса или через IP
-
-		case IDC_EDIT_PREFIX:
-		{
-			if (checkBoxPrefix)
-			{
-				int prefix = (int)SendMessage(hSpin, UDM_GETPOS32, 0, 0);
-				if (prefix >= 0 && prefix <= 32)
-				{
-					DWORD mask = PrefixToMask(prefix);
-					SendMessage(hIPmask, IPM_SETADDRESS, 0, mask);
-				}
-			}
+			SendMessage(hIPmask, IPM_GETADDRESS, 0, (LPARAM)&dwIpMask);
+			DWORD dwIPprefix = 0;
+			for (DWORD iMask = dwIpMask; iMask & 0x80000000; dwIPprefix++) iMask <<= 1;
+			CHAR sz_prefix[3];
+			sprintf(sz_prefix, "%i", dwIPprefix);
+			SendMessage(hEditPrefix, WM_SETTEXT, 0, (LPARAM)sz_prefix);
 		} break;
 
-		case IDC_CHECK_PREFIX:
-		{
-			LRESULT checkBox = SendMessage(hCheckPrefix, BM_GETCHECK, 0, 0);
-
-			checkBoxPrefix = (checkBox == BST_CHECKED);
-			EnableWindow(hSpin, checkBoxPrefix);
-			EnableWindow(hEditPrefix, checkBoxPrefix);
-			EnableWindow(hIPmask, !checkBoxPrefix);
-		} break;
 
 		case IDOK: {} break;
 		
@@ -95,7 +71,31 @@ BOOL CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 		} break;
 	} break;
+
+	case WM_NOTIFY:
+	{
+		HWND hEditPrefix = GetDlgItem(hwnd, IDC_EDIT_PREFIX);
+		HWND hIPmask = GetDlgItem(hwnd, IDC_IPADDRESS_MASK);
+
+		//switch (((NMHDR*)lParam)->idFrom)
+		switch (LOWORD(wParam))
+		{
+		case IDC_SPIN_PREFIX:
+		{
+			std::cout << "WM_NOTIFE:EDC_SPIN_PREFIX" << std::endl;
+			
+			DWORD dwPrefix = ((NMUPDOWN*)lParam)->iPos;
+			INT iDelta = ((NMUPDOWN*)lParam)->iDelta;
+			dwPrefix += iDelta;
+			std::cout << dwPrefix << std::endl;
+			DWORD dwIPMask = ~(0xFFFFFFFF >> dwPrefix);
+			SendMessage(hIPmask, IPM_SETADDRESS, 0, dwIPMask);
+		} break;
+		}
+	} break;
+
 	case WM_CLOSE:
+		FreeConsole();
 		EndDialog(hwnd, 0);
 	}
 	return FALSE;
@@ -106,7 +106,6 @@ int MaskToPrefix(DWORD dwMask)
 	int prefix = 0;
 	DWORD mask = dwMask;
 
-	// подсчёт количества единиц в маске
 	while (mask & 0x80000000) 
 	{
 		prefix++;
@@ -121,11 +120,6 @@ int MaskToPrefix(DWORD dwMask)
 
 DWORD PrefixToMask(int prefix) 
 {
-	if (prefix < 0 || prefix > 32) return 0xFFFFFFFF;
-	return (prefix == 0) ? 0 : (0xFFFFFFFF << (32 - prefix));
-}
-
-void CalculateNetworkInfo(HWND hwnd, DWORD ip, DWORD mask)
-{
-	
+	if (prefix < 0 || prefix > 32) return 0xFFFFFFFF; // некоректный префикс возвращаем маску по умолчанию
+	return (prefix == 0) ? 0 : (0xFFFFFFFF << (32 - prefix)); // создаём маску с N колво едениц слева
 }
