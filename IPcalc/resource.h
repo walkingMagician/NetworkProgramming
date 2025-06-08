@@ -10,8 +10,8 @@
 #define IDC_STATIC_IPADDRESS            1007
 #define IDC_STATIC_PREFIX               1010
 #define IDC_EDIT_PREFIX                 1011
-#define IDC_SPIN1                       1012
 #define IDC_SPIN_PREFIX                 1012
+#define IDC_CHECK_PREFIX                1016
 
 // Next default values for new objects
 // 
@@ -19,7 +19,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        103
 #define _APS_NEXT_COMMAND_VALUE         40001
-#define _APS_NEXT_CONTROL_VALUE         1013
+#define _APS_NEXT_CONTROL_VALUE         1017
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

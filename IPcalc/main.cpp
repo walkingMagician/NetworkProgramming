@@ -1,13 +1,16 @@
-#include <Windows.h>
+п»ї#include <Windows.h>
 #include <CommCtrl.h>
 #include <string>
+#include <sstream>
 #include "resource.h"
 
 
 BOOL CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 int MaskToPrefix(DWORD dwMask);
 DWORD PrefixToMask(int prefix);
+void CalculateNetworkInfo(HWND hwnd, DWORD ip, DWORD mask);
 
+bool checkBoxPrefix = false;
 
 INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInst, LPSTR lpCmdLine, INT nCmdShow)
 {
@@ -21,6 +24,7 @@ BOOL CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	{
 	case WM_INITDIALOG: 
 	{
+
 		HWND hPrefix = GetDlgItem(hwnd, IDC_SPIN_PREFIX);
 		SendMessage(hPrefix, UDM_SETRANGE, 0, MAKELPARAM(32, 0));
 		SetFocus(GetDlgItem(hwnd, IDC_IPADDRESS_IP));
@@ -31,6 +35,7 @@ BOOL CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		HWND hIPmask = GetDlgItem(hwnd, IDC_IPADDRESS_MASK);
 		HWND hEditPrefix = GetDlgItem(hwnd, IDC_EDIT_PREFIX);
 		HWND hSpin = GetDlgItem(hwnd, IDC_SPIN_PREFIX);
+		HWND hCheckPrefix = GetDlgItem(hwnd, IDC_CHECK_PREFIX);
 		DWORD dwIPadddress = 0;
 		DWORD dwIPmask = 0;
 		switch (LOWORD(wParam))
@@ -46,22 +51,39 @@ BOOL CALLBACK DlgProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 		case IDC_IPADDRESS_MASK:
 		{
-			/*SendMessage(hIPmask, IPM_GETADDRESS, 0, (LPARAM)&dwIPmask);
-			int prefix = MaskToPrefix(dwIPmask);
-			if (prefix != -1)
+			if (!checkBoxPrefix)
 			{
-				SetWindowText(hEditPrefix, std::to_wstring(prefix).c_str());
-			}*/
+				SendMessage(hIPmask, IPM_GETADDRESS, 0, (LPARAM)&dwIPmask);
+				int prefix = MaskToPrefix(dwIPmask);
+				if (prefix != -1)
+				{
+					SetWindowText(hEditPrefix, std::to_wstring(prefix).c_str());
+				}
+			}
 		} break;
-		// создать новую кнопку для выпора режима работы префикса или через IP
+		// СЃРѕР·РґР°С‚СЊ РЅРѕРІСѓСЋ РєРЅРѕРїРєСѓ РґР»СЏ РІС‹Р±РѕСЂР° СЂРµР¶РёРјР° СЂР°Р±РѕС‚С‹ РїСЂРµС„РёРєСЃР° РёР»Рё С‡РµСЂРµР· IP
 
 		case IDC_EDIT_PREFIX:
 		{
-			
-			int prefix = (int)SendMessage(hSpin, UDM_GETPOS32, 0, 0);
-			if (prefix < 0 || prefix > 32) return -1;
-			DWORD mask = PrefixToMask(prefix);
-			SendMessage(hIPmask, IPM_SETADDRESS, 0, mask);
+			if (checkBoxPrefix)
+			{
+				int prefix = (int)SendMessage(hSpin, UDM_GETPOS32, 0, 0);
+				if (prefix >= 0 && prefix <= 32)
+				{
+					DWORD mask = PrefixToMask(prefix);
+					SendMessage(hIPmask, IPM_SETADDRESS, 0, mask);
+				}
+			}
+		} break;
+
+		case IDC_CHECK_PREFIX:
+		{
+			LRESULT checkBox = SendMessage(hCheckPrefix, BM_GETCHECK, 0, 0);
+
+			checkBoxPrefix = (checkBox == BST_CHECKED);
+			EnableWindow(hSpin, checkBoxPrefix);
+			EnableWindow(hEditPrefix, checkBoxPrefix);
+			EnableWindow(hIPmask, !checkBoxPrefix);
 		} break;
 
 		case IDOK: {} break;
@@ -84,15 +106,15 @@ int MaskToPrefix(DWORD dwMask)
 	int prefix = 0;
 	DWORD mask = dwMask;
 
-	// подсчёт количества единиц в маске
+	// РїРѕРґСЃС‡С‘С‚ РєРѕР»РёС‡РµСЃС‚РІР° РµРґРёРЅРёС† РІ РјР°СЃРєРµ
 	while (mask & 0x80000000) 
 	{
 		prefix++;
 		mask <<= 1;
 	}
 
-	// если после единиц идут нули, это валидная маска
-	if (mask != 0) return -1; // некорректная маска (ошибка)
+	// РµСЃР»Рё РїРѕСЃР»Рµ РµРґРёРЅРёС† РёРґСѓС‚ РЅСѓР»Рё, СЌС‚Рѕ РІР°Р»РёРґРЅР°СЏ РјР°СЃРєР°
+	if (mask != 0) return -1; // РЅРµРєРѕСЂСЂРµРєС‚РЅР°СЏ РјР°СЃРєР° (РѕС€РёР±РєР°)
 
 	return prefix;
 }
@@ -101,4 +123,9 @@ DWORD PrefixToMask(int prefix)
 {
 	if (prefix < 0 || prefix > 32) return 0xFFFFFFFF;
 	return (prefix == 0) ? 0 : (0xFFFFFFFF << (32 - prefix));
+}
+
+void CalculateNetworkInfo(HWND hwnd, DWORD ip, DWORD mask)
+{
+	
 }
