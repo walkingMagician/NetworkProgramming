@@ -6,8 +6,11 @@
 #include <WS2tcpip.h>
 #include <iphlpapi.h>
 #include <iostream>
+#include <string>
+#include <FormatLastError.h>
 using namespace std;
 
+#pragma comment(lib, "FormatLastError.lib")
 #pragma comment(lib, "Ws2_32.lib")
 #define DEFAULT_PORT "27015"
 #define DEFAULT_BUFFER_LENGTH 1500
@@ -48,7 +51,7 @@ void main()
 	SOCKET connect_socket = socket(hints.ai_family, hints.ai_socktype, hints.ai_protocol);
 	if (connect_socket == INVALID_SOCKET)
 	{
-		//PrintLastEroor(WSAGetLastError());
+		PrintLastEroor(WSAGetLastError());
 		freeaddrinfo(result);
 		WSACleanup();
 		return;
@@ -58,18 +61,34 @@ void main()
 	iResult = connect(connect_socket, result->ai_addr, result->ai_addrlen);
 	if (iResult == SOCKET_ERROR)
 	{
-		//PrintLastEroor(WSAGetLastError());
+		PrintLastEroor(WSAGetLastError());
 		closesocket(connect_socket);
 		freeaddrinfo(result);
 		WSACleanup();
 	}
 
+
 	// 5) отправляем и получение данных с сервера 
-	CONST CHAR sendBuffer[] = "Hello Server";
+	
+	//// Создаем буфер для ввода пользовательских данных
+	//CHAR sendBuffer[DEFAULT_BUFFER_LENGTH] = { 0 };
+
+	//// Получаем ввод от пользователя
+	//printf("Введите сообщение для отправки: ");
+	//fgets(sendBuffer, DEFAULT_BUFFER_LENGTH, stdin);
+
+	//// Убираем символ новой строки, который fgets добавляет в буфер
+	//size_t len = strlen(sendBuffer);
+	//if (len > 0 && sendBuffer[len - 1] == '\n') {
+	//	sendBuffer[len - 1] = '\0';
+	//}
+
+	CONST CHAR sendBuffer[DEFAULT_BUFFER_LENGTH] = { "hello server"};
 	CHAR recvbuffer[DEFAULT_BUFFER_LENGTH] = {};
 	iResult = send(connect_socket, sendBuffer, sizeof(sendBuffer), 0);
 	if (iResult == SOCKET_ERROR)
 	{
+		PrintLastEroor(WSAGetLastError());
 		closesocket(connect_socket);
 		freeaddrinfo(result);
 		WSACleanup();
@@ -81,13 +100,16 @@ void main()
 		iResult = recv(connect_socket, recvbuffer, DEFAULT_BUFFER_LENGTH, 0);
 		if (iResult > 0) cout << "Receved bytes " << iResult << ", Message: " << recvbuffer << endl;
 		else if (iResult == 0) cout << "Connection closing" << endl;
-		else cout << "Error " << endl;
+		else PrintLastEroor(WSAGetLastError());
 	} while (iResult > 0);
 
 	// 6) закрываем соединение
 	iResult = shutdown(connect_socket, SD_SEND);
 	if (iResult == SOCKET_ERROR)
+	{
 		cout << "Error shutdown";
+		PrintLastEroor(WSAGetLastError());
+	}
 	// 7) освобождаем ресурсы winSock
 	closesocket(connect_socket);
 	freeaddrinfo(result);
