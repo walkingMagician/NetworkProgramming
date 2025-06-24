@@ -14,14 +14,13 @@
 #include <FormatLastError.h>
 #include <mutex>
 #include <thread>
-#include <atomic>
 
 using namespace std;
 
 #pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "FormatLastError.lib")
 
-#define DEFAULT_PORT	"27015"
+#define DEFAULT_PORT			"27015"
 #define DEFAULT_BUFFER_LENGTH	1500
 
 int clientID = 1;
@@ -32,6 +31,13 @@ void PrintClientInfo(SOCKET clientSocket);
 DWORD WINAPI ClientHandler(LPVOID lParam);
 DWORD WINAPI RecvThread(LPVOID lParam);
 DWORD WINAPI SendThread(LPVOID lParam);
+
+struct ThreadParameters
+{
+	SOCKET socket;
+	int id;
+	bool run_flag;
+};
 
 
 void main()
@@ -122,10 +128,14 @@ void main()
 			continue;
 		}
 
+		lock_guard<mutex> lock(mtx_client);
 		clientIds[client_socket] = clientID++;
 		PrintClientInfo(client_socket);
 
-		HANDLE hThread = CreateThread(NULL, 0, ClientHandler, (LPVOID)client_socket, 0, NULL);
+		// Создаем параметры для потоков
+		ThreadParameters* params = new ThreadParameters{ client_socket, clientIds[client_socket], true };
+
+		HANDLE hThread = CreateThread(NULL, 0, ClientHandler, params, 0, NULL);
 		if (hThread == NULL)
 		{
 			cout << "Failed to create thread for client" << endl;
@@ -195,60 +205,80 @@ void PrintClientInfo(SOCKET clientSocket)
 
 DWORD WINAPI ClientHandler(LPVOID lParam)
 {
-	SOCKET client_socket = (SOCKET)lParam;
-	int clientID = clientIds[client_socket];
-	CHAR recvbuffer[DEFAULT_BUFFER_LENGTH] = {};
-	int iResult;
-	do
+	ThreadParameters* params = (ThreadParameters*)lParam;
+	SOCKET client_socket = params->socket;
+	int hClientID = params->id;
+
+	// копируем
+	ThreadParameters recvParamet = *params;
+	ThreadParameters sendParamet = *params;
+	
+	HANDLE hRevcThread = CreateThread(NULL, 0, RecvThread, &recvParamet, 0, NULL);
+	HANDLE hSendThread = CreateThread(NULL, 0, SendThread, &sendParamet, 0, NULL);
+
+
+	if (hRevcThread == NULL || hSendThread == NULL)
 	{
-		iResult = recv(client_socket, recvbuffer, DEFAULT_BUFFER_LENGTH, 0); // ожидание 
-		if (iResult > 0)
-		{
-			printf("Receved bytes %i, Message: %s\n", iResult, recvbuffer);
+		cerr << "Failed to created thread for client " << hClientID << endl;
+		
+		lock_guard<mutex> lock(mtx_client);
+		clientIds.erase(client_socket);
+		closesocket(client_socket);
+		PrintLastEroor(WSAGetLastError());
+		delete params;
+		return 1;
+	}
 
-			// добавляем ID клиента в ответ
-			string response = "[Server] ID: " + to_string(clientIds[client_socket]) +
-				". Your message: " + recvbuffer;
+	// ждём завершение потоков
+	WaitForSingleObject(hRevcThread, INFINITE);
+	params->run_flag = false;
+	WaitForSingleObject(hSendThread, INFINITE);
 
-			if (send(client_socket, response.c_str(), response.length(), 0) == SOCKET_ERROR) // ответ клиенту
-			{
-				printf("[Client %i] send() failed with", clientID);
-				PrintLastEroor(WSAGetLastError());
-				break;
-			}
-		}
-		else if (iResult == 0) cout << "Connection closing" << endl;
-		else
-		{	
-			printf("[Client %i]", clientID);
-			PrintLastEroor(WSAGetLastError());
-		}
-	} while (iResult > 0);
+	// закрываем дескрипторы
+	CloseHandle(hRevcThread);
+	CloseHandle(hSendThread);
 
-	clientIds.erase(client_socket);
+	// удаялем клиента 
+	{
+		lock_guard<mutex> lock(mtx_client);
+		clientIds.erase(client_socket);
+	}
+
 	closesocket(client_socket);
+	delete params;
+
 	return 0;
 }
 
 DWORD WINAPI RecvThread(LPVOID lParam)
 {
-	SOCKET client_socket = (SOCKET)lParam;
-	int clientID = clientIds[client_socket];
-	CHAR recvBuffer[DEFAULT_BUFFER_LENGTH] = {};
+	ThreadParameters* params = (ThreadParameters*)lParam;
+	SOCKET recv_client_socket = params->socket;
+	int recv_clientID = params->id;
+
+	CHAR recv_buffer[DEFAULT_BUFFER_LENGTH] = {};
 	int iResult;
 
-	while (true)
+	while (params->run_flag)
 	{
-		iResult = recv(client_socket, recvBuffer, DEFAULT_BUFFER_LENGTH, 0);
+		iResult = recv(recv_client_socket, recv_buffer, DEFAULT_BUFFER_LENGTH, 0);
 		if (iResult > 0)
 		{
-			printf("Receved bytes %i, Message: %s\n", iResult, recvBuffer);
+			//recv_buffer[iResult] = '\0'; // проверка на ноль
+			printf("[Client %i] received %d bytes, message: %s\n", recv_clientID, iResult, recv_buffer);
 		}
-		else if (iResult == 0) cout << "Connection closing" << endl;
+		else if (iResult == 0)
+		{
+			printf("[Client %i] disconected\n", recv_clientID);
+			params->run_flag = false;
+			return 1;
+		}
 		else
 		{
-			printf("[Client %i]", clientID);
+			printf("[Client %i] Error recv: ", recv_clientID);
 			PrintLastEroor(WSAGetLastError());
+			params->run_flag = false;
+			return 1;
 		}
 	}
 	return 0;
@@ -256,21 +286,20 @@ DWORD WINAPI RecvThread(LPVOID lParam)
 
 DWORD WINAPI SendThread(LPVOID lParam) 
 {
-	SOCKET client_socket = (SOCKET)lParam;
-	int clientID = clientIds[client_socket];
-	CHAR recvBuffer[DEFAULT_BUFFER_LENGTH] = {};
-	int iResult;
+	ThreadParameters* params = (ThreadParameters*)lParam;
+	SOCKET send_client_socket = params->socket;
+	int send_clientID = params->id;
+	
+	string response = "[Server] Your ID: " + to_string(send_clientID);
+	int iResult = send(send_client_socket, response.c_str(), response.length(), 0);
 
-	while (true)
+	if (iResult == SOCKET_ERROR)
 	{
-		string response = "[Server] you ID: " + to_string(clientIds[client_socket]);
-
-		if (iResult = send(client_socket, response.c_str(), response.length(), 0) == SOCKET_ERROR)
-		{
-			printf("[Client %i] send() failed with", clientID);
-			PrintLastEroor(WSAGetLastError());
-			break;
-		}
+		printf("Client %i Error send", send_clientID);
+		PrintLastEroor(WSAGetLastError());
+		params->run_flag = false;
+		return 1;
 	}
+
 	return 0;
 }
