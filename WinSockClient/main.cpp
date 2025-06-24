@@ -8,12 +8,17 @@
 #include <iostream>
 #include <string>
 #include <FormatLastError.h>
+
+
 using namespace std;
 
 #pragma comment(lib, "FormatLastError.lib")
 #pragma comment(lib, "Ws2_32.lib")
 #define DEFAULT_PORT "27015"
 #define DEFAULT_BUFFER_LENGTH 1500
+
+
+
 
 
 void main()
@@ -44,9 +49,6 @@ void main()
 		cout << "getaddressinfo() failed witch code " << iResult << endl;
 		return;
 	}
-
-	//cout << "hints: " << endl;
-	//cout << "ai_addr" << hints.ai_addr->sa_data << endl;
 
 	SOCKET connect_socket = socket(hints.ai_family, hints.ai_socktype, hints.ai_protocol);
 	if (connect_socket == INVALID_SOCKET)
@@ -94,7 +96,6 @@ void main()
 		WSACleanup();
 		return;
 	}
-	
 	do
 	{
 		iResult = recv(connect_socket, recvbuffer, DEFAULT_BUFFER_LENGTH, 0);

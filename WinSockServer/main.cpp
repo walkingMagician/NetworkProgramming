@@ -12,6 +12,10 @@
 #include <map>
 #include <string>
 #include <FormatLastError.h>
+#include <mutex>
+#include <thread>
+#include <atomic>
+
 using namespace std;
 
 #pragma comment(lib, "Ws2_32.lib")
@@ -22,10 +26,12 @@ using namespace std;
 
 int clientID = 1;
 map<SOCKET, int> clientIds;
-
+mutex mtx_client;
 
 void PrintClientInfo(SOCKET clientSocket);
 DWORD WINAPI ClientHandler(LPVOID lParam);
+DWORD WINAPI RecvThread(LPVOID lParam);
+DWORD WINAPI SendThread(LPVOID lParam);
 
 
 void main()
@@ -105,6 +111,33 @@ void main()
 		return;
 	}*/
 
+	// постоянно ждём клиентов  
+	while (true)
+	{
+		SOCKET client_socket = accept(listen_socket, NULL, NULL);
+		if (client_socket == INVALID_SOCKET)
+		{
+			cout << "accept() failed with ";
+			PrintLastEroor(WSAGetLastError());
+			continue;
+		}
+
+		clientIds[client_socket] = clientID++;
+		PrintClientInfo(client_socket);
+
+		HANDLE hThread = CreateThread(NULL, 0, ClientHandler, (LPVOID)client_socket, 0, NULL);
+		if (hThread == NULL)
+		{
+			cout << "Failed to create thread for client" << endl;
+			clientIds.erase(client_socket);
+			closesocket(client_socket);
+		}
+		else 
+		{
+			CloseHandle(hThread);
+		}
+	}
+
 	//clientIds[client_socket] = clientID++;
 	//PrintClientInfo(client_socket);
 
@@ -135,33 +168,7 @@ void main()
 		}
 	} while (iResult > 0);
 	*/
-	while (true)
-	{
-		SOCKET client_socket = accept(listen_socket, NULL, NULL);
-		if (client_socket == INVALID_SOCKET)
-		{
-			cout << "accept() failed with ";
-			PrintLastEroor(WSAGetLastError());
-			continue;
-		}
 
-		clientIds[client_socket] = clientID++;
-		PrintClientInfo(client_socket);
-
-		HANDLE hThread = CreateThread(NULL, 0, ClientHandler, (LPVOID)client_socket, 0, NULL);
-		if (hThread == NULL)
-		{
-			cout << "Failed to create thread for client" << endl;
-			clientIds.erase(client_socket);
-			closesocket(client_socket);
-		}
-		else 
-		{
-			CloseHandle(hThread);
-		}
-	}
-
-	//clientIds.erase(client_socket); // Удаляем клиента из map при отключении
 
 	// ?) освобождение ресурсов 
 	//closesocket(client_socket);
@@ -174,14 +181,14 @@ void PrintClientInfo(SOCKET clientSocket)
 {
 	sockaddr_in clientAddr;
 	int addrLen = sizeof(clientAddr);
-	if (getpeername(clientSocket, (sockaddr*)&clientAddr, &addrLen) == SOCKET_ERROR)
+	if (getpeername(clientSocket, (sockaddr*)&clientAddr, &addrLen) == SOCKET_ERROR) // получаем адрусную информацию
 	{
 		PrintLastEroor(WSAGetLastError());
 		return;
 	}
 	
 	char ipStr[INET_ADDRSTRLEN];
-	inet_ntop(AF_INET, &clientAddr.sin_addr, ipStr, INET_ADDRSTRLEN);
+	inet_ntop(AF_INET, &clientAddr.sin_addr, ipStr, INET_ADDRSTRLEN); // из бинарного формата в строковый 
 
 	printf("Client IP: %s\nPort: %i\nAssigned ID: %d\n", ipStr, ntohs(clientAddr.sin_port), clientIds[clientSocket]);
 }
@@ -194,16 +201,16 @@ DWORD WINAPI ClientHandler(LPVOID lParam)
 	int iResult;
 	do
 	{
-		iResult = recv(client_socket, recvbuffer, DEFAULT_BUFFER_LENGTH, 0);
+		iResult = recv(client_socket, recvbuffer, DEFAULT_BUFFER_LENGTH, 0); // ожидание 
 		if (iResult > 0)
 		{
 			printf("Receved bytes %i, Message: %s\n", iResult, recvbuffer);
 
-			// Добавляем ID клиента в ответ
-			string response = "[Server] Your ID: " + to_string(clientIds[client_socket]) +
+			// добавляем ID клиента в ответ
+			string response = "[Server] ID: " + to_string(clientIds[client_socket]) +
 				". Your message: " + recvbuffer;
 
-			if (send(client_socket, response.c_str(), response.length(), 0) == SOCKET_ERROR)
+			if (send(client_socket, response.c_str(), response.length(), 0) == SOCKET_ERROR) // ответ клиенту
 			{
 				printf("[Client %i] send() failed with", clientID);
 				PrintLastEroor(WSAGetLastError());
@@ -220,5 +227,50 @@ DWORD WINAPI ClientHandler(LPVOID lParam)
 
 	clientIds.erase(client_socket);
 	closesocket(client_socket);
+	return 0;
+}
+
+DWORD WINAPI RecvThread(LPVOID lParam)
+{
+	SOCKET client_socket = (SOCKET)lParam;
+	int clientID = clientIds[client_socket];
+	CHAR recvBuffer[DEFAULT_BUFFER_LENGTH] = {};
+	int iResult;
+
+	while (true)
+	{
+		iResult = recv(client_socket, recvBuffer, DEFAULT_BUFFER_LENGTH, 0);
+		if (iResult > 0)
+		{
+			printf("Receved bytes %i, Message: %s\n", iResult, recvBuffer);
+		}
+		else if (iResult == 0) cout << "Connection closing" << endl;
+		else
+		{
+			printf("[Client %i]", clientID);
+			PrintLastEroor(WSAGetLastError());
+		}
+	}
+	return 0;
+}
+
+DWORD WINAPI SendThread(LPVOID lParam) 
+{
+	SOCKET client_socket = (SOCKET)lParam;
+	int clientID = clientIds[client_socket];
+	CHAR recvBuffer[DEFAULT_BUFFER_LENGTH] = {};
+	int iResult;
+
+	while (true)
+	{
+		string response = "[Server] you ID: " + to_string(clientIds[client_socket]);
+
+		if (iResult = send(client_socket, response.c_str(), response.length(), 0) == SOCKET_ERROR)
+		{
+			printf("[Client %i] send() failed with", clientID);
+			PrintLastEroor(WSAGetLastError());
+			break;
+		}
+	}
 	return 0;
 }
