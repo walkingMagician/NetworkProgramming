@@ -1,50 +1,50 @@
-#include "clientFunctions.h"
+п»ї#include "clientFunctions.h"
 #include <iostream>
 #include <string>
 #include "FormatLastError.h"
 
 using namespace std;
 
-void PrintClientInfo(SOCKET clientSocket) // вывод информации о подключеённым клиенте
+void PrintClientInfo(SOCKET clientSocket) // РІС‹РІРѕРґ РёРЅС„РѕСЂРјР°С†РёРё Рѕ РїРѕРґРєР»СЋС‡РµС‘РЅРЅС‹Рј РєР»РёРµРЅС‚Рµ
 {
-	// получаем информацию о клиенте
+	// РїРѕР»СѓС‡Р°РµРј РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ РєР»РёРµРЅС‚Рµ
 	sockaddr_in clientAddr;
 	int addrLen = sizeof(clientAddr);
-	if (getpeername(clientSocket, (sockaddr*)&clientAddr, &addrLen) == SOCKET_ERROR) // получаем адрусную информацию
+	if (getpeername(clientSocket, (sockaddr*)&clientAddr, &addrLen) == SOCKET_ERROR) // РїРѕР»СѓС‡Р°РµРј Р°РґСЂСѓСЃРЅСѓСЋ РёРЅС„РѕСЂРјР°С†РёСЋ
 	{
 		PrintLastEroor(WSAGetLastError());
 		return;
 	}
 
-	// преобразуем из бинарного формата в строковый
+	// РїСЂРµРѕР±СЂР°Р·СѓРµРј РёР· Р±РёРЅР°СЂРЅРѕРіРѕ С„РѕСЂРјР°С‚Р° РІ СЃС‚СЂРѕРєРѕРІС‹Р№
 	char ipStr[INET_ADDRSTRLEN];
 	inet_ntop(AF_INET, &clientAddr.sin_addr, ipStr, INET_ADDRSTRLEN);  
 
-	// вывод инфы 
+	// РІС‹РІРѕРґ РёРЅС„С‹ 
 	printf("Client IP: %s\nPort: %i\nAssigned ID: %d\n", ipStr, ntohs(clientAddr.sin_port), clientIds[clientSocket]);
 }
 
-DWORD WINAPI ClientHandler(LPVOID lParam) // обработка соединение с клиентом
+DWORD WINAPI ClientHandler(LPVOID lParam) // РѕР±СЂР°Р±РѕС‚РєР° СЃРѕРµРґРёРЅРµРЅРёРµ СЃ РєР»РёРµРЅС‚РѕРј
 {
-	// получаем параметры от переданной структуры 
-	ThreadParameters* params = (ThreadParameters*)lParam; // приводим params к нашему типу
+	// РїРѕР»СѓС‡Р°РµРј РїР°СЂР°РјРµС‚СЂС‹ РѕС‚ РїРµСЂРµРґР°РЅРЅРѕР№ СЃС‚СЂСѓРєС‚СѓСЂС‹ 
+	ThreadParameters* params = (ThreadParameters*)lParam; // РїСЂРёРІРѕРґРёРј params Рє РЅР°С€РµРјСѓ С‚РёРїСѓ
 	SOCKET client_socket = params->socket;
 	int hClientID = params->id;
 
-	// копируем параметры для потоков
+	// РєРѕРїРёСЂСѓРµРј РїР°СЂР°РјРµС‚СЂС‹ РґР»СЏ РїРѕС‚РѕРєРѕРІ
 	ThreadParameters recvParamet = *params;
 	ThreadParameters sendParamet = *params;
 
-	// создаем потоки отправки и приёма
+	// СЃРѕР·РґР°РµРј РїРѕС‚РѕРєРё РѕС‚РїСЂР°РІРєРё Рё РїСЂРёС‘РјР°
 	HANDLE hRevcThread = CreateThread(NULL, 0, RecvThread, &recvParamet, 0, NULL);
 	HANDLE hSendThread = CreateThread(NULL, 0, SendThread, &sendParamet, 0, NULL);
 
-	// проверка на то как успешно создыны потоки 
+	// РїСЂРѕРІРµСЂРєР° РЅР° С‚Рѕ РєР°Рє СѓСЃРїРµС€РЅРѕ СЃРѕР·РґС‹РЅС‹ РїРѕС‚РѕРєРё 
 	if (hRevcThread == NULL || hSendThread == NULL)
 	{
 		cerr << "Failed to created thread for client " << hClientID << endl;
 
-		// удаление клиента 
+		// СѓРґР°Р»РµРЅРёРµ РєР»РёРµРЅС‚Р° 
 		lock_guard<mutex> lock(mtx_client);
 		clientIds.erase(client_socket);
 		closesocket(client_socket);
@@ -53,32 +53,32 @@ DWORD WINAPI ClientHandler(LPVOID lParam) // обработка соединение с клиентом
 		return 1;
 	}
 
-	// ждём завершение потоков 
-	WaitForSingleObject(hRevcThread, INFINITE); // INFINITE - бечконечное ожидание
-	params->run_flag = false; // сигнал что поток hRevcThread закончил работу 
+	// Р¶РґС‘Рј Р·Р°РІРµСЂС€РµРЅРёРµ РїРѕС‚РѕРєРѕРІ 
+	WaitForSingleObject(hRevcThread, INFINITE); // INFINITE - Р±РµС‡РєРѕРЅРµС‡РЅРѕРµ РѕР¶РёРґР°РЅРёРµ
+	params->run_flag = false; // СЃРёРіРЅР°Р» С‡С‚Рѕ РїРѕС‚РѕРє hRevcThread Р·Р°РєРѕРЅС‡РёР» СЂР°Р±РѕС‚Сѓ 
 	WaitForSingleObject(hSendThread, INFINITE);
 
-	// закрываем дескрипторы потоков
+	// Р·Р°РєСЂС‹РІР°РµРј РґРµСЃРєСЂРёРїС‚РѕСЂС‹ РїРѕС‚РѕРєРѕРІ
 	CloseHandle(hRevcThread);
 	CloseHandle(hSendThread);
 
-	// удаялем клиента 
+	// СѓРґР°СЏР»РµРј РєР»РёРµРЅС‚Р° 
 	{
 		lock_guard<mutex> lock(mtx_client);
 		clientIds.erase(client_socket);
 	}
 
-	// освобождение памяти  и закрытие сокета
+	// РѕСЃРІРѕР±РѕР¶РґРµРЅРёРµ РїР°РјСЏС‚Рё  Рё Р·Р°РєСЂС‹С‚РёРµ СЃРѕРєРµС‚Р°
 	closesocket(client_socket);
 	delete params;
 
 	return 0;
 }
 
-DWORD WINAPI RecvThread(LPVOID lParam) // приём данных от клиента
+DWORD WINAPI RecvThread(LPVOID lParam) // РїСЂРёС‘Рј РґР°РЅРЅС‹С… РѕС‚ РєР»РёРµРЅС‚Р°
 {
-	// получаем параметры от переданной структуры 
-	ThreadParameters* params = (ThreadParameters*)lParam; // приводим params к нужному типу
+	// РїРѕР»СѓС‡Р°РµРј РїР°СЂР°РјРµС‚СЂС‹ РѕС‚ РїРµСЂРµРґР°РЅРЅРѕР№ СЃС‚СЂСѓРєС‚СѓСЂС‹ 
+	ThreadParameters* params = (ThreadParameters*)lParam; // РїСЂРёРІРѕРґРёРј params Рє РЅСѓР¶РЅРѕРјСѓ С‚РёРїСѓ
 	SOCKET recv_client_socket = params->socket;
 	int recv_clientID = params->id;
 
@@ -87,42 +87,42 @@ DWORD WINAPI RecvThread(LPVOID lParam) // приём данных от клиента
 
 	while (params->run_flag)
 	{
-		// приём данных от клиента
+		// РїСЂРёС‘Рј РґР°РЅРЅС‹С… РѕС‚ РєР»РёРµРЅС‚Р°
 		iResult = recv(recv_client_socket, recv_buffer, DEFAULT_BUFFER_LENGTH, 0);
-		if (iResult > 0) // успех
+		if (iResult > 0) // СѓСЃРїРµС…
 		{
-			//recv_buffer[iResult] = '\0'; // проверка на ноль на всякий случай 
+			//recv_buffer[iResult] = '\0'; // РїСЂРѕРІРµСЂРєР° РЅР° РЅРѕР»СЊ РЅР° РІСЃСЏРєРёР№ СЃР»СѓС‡Р°Р№ 
 			printf("[Client %i] received %d bytes, message: %s\n", recv_clientID, iResult, recv_buffer);
 		}
-		else if (iResult == 0) // отключение
+		else if (iResult == 0) // РѕС‚РєР»СЋС‡РµРЅРёРµ
 		{
 			printf("[Client %i] disconected\n", recv_clientID);
 			params->run_flag = false;
 			return 1;
 		}
-		else // ошибка приёма 
+		else // РѕС€РёР±РєР° РїСЂРёС‘РјР° 
 		{
 			printf("[Client %i] Error recv: ", recv_clientID);
 			PrintLastEroor(WSAGetLastError());
-			params->run_flag = false; // устанавливаем флаг = false если клиент отключён или ошибка 
+			params->run_flag = false; // СѓСЃС‚Р°РЅР°РІР»РёРІР°РµРј С„Р»Р°Рі = false РµСЃР»Рё РєР»РёРµРЅС‚ РѕС‚РєР»СЋС‡С‘РЅ РёР»Рё РѕС€РёР±РєР° 
 			return 1;
 		}
 	}
 	return 0;
 }
 
-DWORD WINAPI SendThread(LPVOID lParam) // отправка даных клиенту
+DWORD WINAPI SendThread(LPVOID lParam) // РѕС‚РїСЂР°РІРєР° РґР°РЅС‹С… РєР»РёРµРЅС‚Сѓ
 {
-	// получаем параметры от переданной структуры 
-	ThreadParameters* params = (ThreadParameters*)lParam; // приводим params к нужному типу
+	// РїРѕР»СѓС‡Р°РµРј РїР°СЂР°РјРµС‚СЂС‹ РѕС‚ РїРµСЂРµРґР°РЅРЅРѕР№ СЃС‚СЂСѓРєС‚СѓСЂС‹ 
+	ThreadParameters* params = (ThreadParameters*)lParam; // РїСЂРёРІРѕРґРёРј params Рє РЅСѓР¶РЅРѕРјСѓ С‚РёРїСѓ
 	SOCKET send_client_socket = params->socket;
 	int send_clientID = params->id;
 	
-	// сообщение от сервера клиенту
+	// СЃРѕРѕР±С‰РµРЅРёРµ РѕС‚ СЃРµСЂРІРµСЂР° РєР»РёРµРЅС‚Сѓ
 	string response = "[Server] Your ID: " + to_string(send_clientID);
-	int iResult = send(send_client_socket, response.c_str(), response.length(), 0); // отправка сообщение клиенту
+	int iResult = send(send_client_socket, response.c_str(), response.length(), 0); // РѕС‚РїСЂР°РІРєР° СЃРѕРѕР±С‰РµРЅРёРµ РєР»РёРµРЅС‚Сѓ
 
-	if (iResult == SOCKET_ERROR) // обработчик ошибки 
+	if (iResult == SOCKET_ERROR) // РѕР±СЂР°Р±РѕС‚С‡РёРє РѕС€РёР±РєРё 
 	{
 		printf("Client %i Error send", send_clientID);
 		PrintLastEroor(WSAGetLastError());
@@ -133,4 +133,4 @@ DWORD WINAPI SendThread(LPVOID lParam) // отправка даных клиенту
 	return 0;
 }
 
-//LPVOID - указатель который может ссылаться на разные типы данных, тот же самый void*
+//LPVOID - СѓРєР°Р·Р°С‚РµР»СЊ РєРѕС‚РѕСЂС‹Р№ РјРѕР¶РµС‚ СЃСЃС‹Р»Р°С‚СЊСЃСЏ РЅР° СЂР°Р·РЅС‹Рµ С‚РёРїС‹ РґР°РЅРЅС‹С…, С‚РѕС‚ Р¶Рµ СЃР°РјС‹Р№ void*

@@ -1,8 +1,8 @@
-#pragma once
+п»ї#pragma once
 
 #include "commonVariables.h"
 
-void PrintClientInfo(SOCKET clientSocket); // вывод информации о подключеённым клиенте
-DWORD WINAPI ClientHandler(LPVOID lParam); // обработка соединение с клиентом
-DWORD WINAPI RecvThread(LPVOID lParam); // приём данных от клиента
-DWORD WINAPI SendThread(LPVOID lParam); // отправка даных клиенту
+void PrintClientInfo(SOCKET clientSocket); // РІС‹РІРѕРґ РёРЅС„РѕСЂРјР°С†РёРё Рѕ РїРѕРґРєР»СЋС‡РµС‘РЅРЅС‹Рј РєР»РёРµРЅС‚Рµ
+DWORD WINAPI ClientHandler(LPVOID lParam); // РѕР±СЂР°Р±РѕС‚РєР° СЃРѕРµРґРёРЅРµРЅРёРµ СЃ РєР»РёРµРЅС‚РѕРј
+DWORD WINAPI RecvThread(LPVOID lParam); // РїСЂРёС‘Рј РґР°РЅРЅС‹С… РѕС‚ РєР»РёРµРЅС‚Р°
+DWORD WINAPI SendThread(LPVOID lParam); // РѕС‚РїСЂР°РІРєР° РґР°РЅС‹С… РєР»РёРµРЅС‚Сѓ

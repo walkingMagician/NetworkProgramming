@@ -1,4 +1,4 @@
-#include "commonVariables.h"
+﻿#include "commonVariables.h"
 
 int clientID = 1;
 std::map<SOCKET, int> clientIds;
