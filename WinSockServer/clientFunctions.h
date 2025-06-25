@@ -2,7 +2,7 @@
 
 #include "commonVariables.h"
 
-void PrintClientInfo(SOCKET clientSocket);
-DWORD WINAPI ClientHandler(LPVOID lParam);
-DWORD WINAPI RecvThread(LPVOID lParam);
-DWORD WINAPI SendThread(LPVOID lParam);
+void PrintClientInfo(SOCKET clientSocket); // вывод информации о подключеённым клиенте
+DWORD WINAPI ClientHandler(LPVOID lParam); // обработка соединение с клиентом
+DWORD WINAPI RecvThread(LPVOID lParam); // приём данных от клиента
+DWORD WINAPI SendThread(LPVOID lParam); // отправка даных клиенту
