@@ -74,11 +74,11 @@ void main()
 	
 	//// Создаем буфер для ввода пользовательских данных
 	//CHAR sendBuffer[DEFAULT_BUFFER_LENGTH] = { 0 };
-
+	//
 	//// Получаем ввод от пользователя
 	//printf("Введите сообщение для отправки: ");
 	//fgets(sendBuffer, DEFAULT_BUFFER_LENGTH, stdin);
-
+	//
 	//// Убираем символ новой строки, который fgets добавляет в буфер
 	//size_t len = strlen(sendBuffer);
 	//if (len > 0 && sendBuffer[len - 1] == '\n') {
